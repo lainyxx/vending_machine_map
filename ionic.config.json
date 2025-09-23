@@ -1,0 +1,7 @@
+{
+  "name": "vending_machine_map",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
