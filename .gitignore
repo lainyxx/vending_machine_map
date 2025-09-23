@@ -68,3 +68,22 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Capacitor Android
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.idea/
+
+# Capacitor iOS
+/ios/App/build/
+/ios/App/Pods/
+/ios/App/Podfile.lock
+/ios/App/*.xcworkspace
+/ios/App/.idea/
+
+# Environment files
+/src/environments/environment.prod.ts
+.env
+.env.*
