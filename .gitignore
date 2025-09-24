@@ -85,5 +85,6 @@ android/.idea/
 
 # Environment files
 /src/environments/environment.prod.ts
+/android/gradle.properties
 .env
 .env.*

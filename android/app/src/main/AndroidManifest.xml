@@ -12,7 +12,7 @@
         <!-- Google Maps APIキーをここに追加 -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyC-MAdmwXw9gGTwAxGMDjD1SNgKONy9sB8"/>
+            android:value="@string/google_maps_key"/>
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"

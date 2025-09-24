@@ -1,3 +1,11 @@
 ion-title {
   text-align:center;
 }
+
+ion-content {
+  --background: transparent;
+}
+
+body {
+  background: transparent;
+}
