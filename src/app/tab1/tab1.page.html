@@ -3,8 +3,14 @@
 <ion-content [fullscreen]="true">
   <ion-header>
     <ion-toolbar>
-      <ion-title size="large" slot="">格安自販機マップ</ion-title>
+      <ion-title size="large" slot="">自販機マップ</ion-title>
     </ion-toolbar>
   </ion-header>
+
+  <!-- 高さを必ず指定する -->
+  <capacitor-google-map
+    id="map"
+    style="display: inline-block; width: 100%; height: 100%;"
+  ></capacitor-google-map>
 
 </ion-content>

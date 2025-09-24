@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">vending_machine_map</string>
+    <string name="title_activity_main">vending_machine_map</string>
+    <string name="package_name">com.lainy.vending_machine_map</string>
+    <string name="custom_url_scheme">com.lainy.vending_machine_map</string>
+</resources>
