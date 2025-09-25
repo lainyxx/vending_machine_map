@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1085490604813",
+    "project_id": "vendingmachinemap-71cf3",
+    "storage_bucket": "vendingmachinemap-71cf3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1085490604813:android:7e197d6e84187e75015e44",
+        "android_client_info": {
+          "package_name": "com.lainy.vending_machine_map"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBl8bCKc_JkEZcDXDGRF554xmvZAjZ7Oeo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
