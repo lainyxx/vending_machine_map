@@ -19,19 +19,19 @@
 <ion-footer>
   <ion-toolbar>
     <ion-buttons slot="primary">
-      <ion-button (click)="hello()">
+      <ion-button class="ripple-button round" (click)="hello(); rippleEffect($event)">
         <ion-icon slot="icon-only" name="home-outline"></ion-icon>
       </ion-button>
-      <ion-button>
+      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
         <ion-icon slot="icon-only" name="search-outline"></ion-icon>
       </ion-button>
-      <ion-button (click)="addCurrentLocation()">
+      <ion-button class="ripple-button round" (click)="addCurrentLocation(); rippleEffect($event)">
         <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
       </ion-button>
-      <ion-button>
+      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
         <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
       </ion-button>
-      <ion-button>
+      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
         <ion-icon slot="icon-only" name="person-outline"></ion-icon>
       </ion-button>
     </ion-buttons>

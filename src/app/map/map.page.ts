@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, CUSTOM_ELEMENTS_SCHEMA, inject } from '@angular/core';
+import { Component, OnInit, AfterViewInit, CUSTOM_ELEMENTS_SCHEMA, Renderer2  } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular/standalone';
@@ -34,7 +34,7 @@ export class MapPage implements OnInit, AfterViewInit {
   private markerIds: string[] = [];
   db!: Firestore;
 
-  constructor() {
+  constructor(private renderer: Renderer2) {
     addIcons({ homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
 
@@ -109,5 +109,25 @@ export class MapPage implements OnInit, AfterViewInit {
 
   hello() {
      alert('hello');       //test
+  }
+
+  rippleEffect(event: MouseEvent) {
+    const button = event.currentTarget as HTMLElement;
+
+    const ripple = this.renderer.createElement('span');
+    this.renderer.addClass(ripple, 'ripple');
+
+    const rect = button.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    ripple.style.width = ripple.style.height = `${size}px`;
+
+    ripple.style.left = `${event.clientX - rect.left - size / 2}px`;
+    ripple.style.top = `${event.clientY - rect.top - size / 2}px`;
+
+    this.renderer.appendChild(button, ripple);
+
+    setTimeout(() => {
+      this.renderer.removeChild(button, ripple);
+    }, 600);
   }
 }
