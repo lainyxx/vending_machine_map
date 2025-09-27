@@ -33,6 +33,7 @@ export class MapPage implements OnInit, AfterViewInit {
   map!: GoogleMap;
   private markerIds: string[] = [];
   db!: Firestore;
+  isAddMarkerMode = false; // マーカー追加モード
 
   constructor(private renderer: Renderer2) {
     addIcons({ homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
@@ -93,6 +94,26 @@ export class MapPage implements OnInit, AfterViewInit {
       title: '東京駅',
       snippet: 'サンプル',
     });
+
+    // マップクリックリスナー
+    this.map.setOnMapClickListener(async (event) => {
+      if (!this.isAddMarkerMode) return;
+
+      const lat = event.latitude;
+      const lng = event.longitude;
+
+      const markerId = await this.map.addMarker({
+        coordinate: { lat, lng },
+        title: '新しいマーカー',
+      });
+      this.markerIds.push(markerId);
+
+      // Firestore に保存
+      await this.addMarker(lat, lng);
+
+      // 追加後にモードを自動OFFにしたい場合は以下
+      // this.isAddMarkerMode = false;
+    });
   }
 
   // Firestore にマーカー追加
@@ -101,16 +122,19 @@ export class MapPage implements OnInit, AfterViewInit {
     await addDoc(vendingCol, { lat, lng });
   }
 
-  // 現在地を取得してマーカー追加
-  async addCurrentLocation() {
-    const pos = await Geolocation.getCurrentPosition();
-    await this.addMarker(pos.coords.latitude, pos.coords.longitude);
+  // 
+  async addMarkerMode() {
+    this.isAddMarkerMode = true;
+    alert('マーカー追加モード ON');
   }
 
-  hello() {
-     alert('hello');       //test
+  viewMode() {
+    this.isAddMarkerMode = false;
+     alert('マーカー追加モード OFF');
   }
 
+
+  // ボタンを押したときのエフェクト
   rippleEffect(event: MouseEvent) {
     const button = event.currentTarget as HTMLElement;
 
