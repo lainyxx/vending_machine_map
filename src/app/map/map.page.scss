@@ -31,3 +31,29 @@ ion-icon {
   font-size: 28px;               /* アイコンサイズ */
   color: #555;
 }
+
+.ripple-button {
+  position: relative;
+  overflow: hidden; /* ボタンからはみ出さないようにする */
+  border-radius: 50%; /* 丸ボタン用 */
+}
+
+.ripple-button.round {
+  border-radius: 50%; /* 角丸の場合はこのクラスを付ける */
+}
+
+.ripple-button .ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple-animation 600ms linear;
+  background-color: rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
