@@ -34,6 +34,10 @@ export class MapPage implements OnInit, AfterViewInit {
   private markerIds: string[] = [];
   db!: Firestore;
   isAddMarkerMode = false; // マーカー追加モード
+  currentLocationMarkerId?: string;
+  watchId?: string;
+  curLat?: number;
+  curLng?: number;
 
   constructor(private renderer: Renderer2) {
     addIcons({ homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
@@ -114,6 +118,13 @@ export class MapPage implements OnInit, AfterViewInit {
       // 追加後にモードを自動OFFにしたい場合は以下
       // this.isAddMarkerMode = false;
     });
+    // マップ作成後に現在地監視開始
+    this.startTrackingCurrentLocation();
+  }
+
+  // 画面離脱時
+  ngOnDestroy() {
+    this.stopTrackingCurrentLocation();
   }
 
   // Firestore にマーカー追加
@@ -122,7 +133,46 @@ export class MapPage implements OnInit, AfterViewInit {
     await addDoc(vendingCol, { lat, lng });
   }
 
-  // 
+  async startTrackingCurrentLocation() {
+    // すでに監視中なら停止
+    if (this.watchId) {
+      Geolocation.clearWatch({ id: this.watchId });
+    }
+
+    this.watchId = await Geolocation.watchPosition(
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+      async (position, err) => {
+        if (err) {
+          console.error('位置情報取得エラー', err);
+          return;
+        }
+        if (!position) return;
+
+        this.curLat = position.coords.latitude;
+        this.curLng = position.coords.longitude;
+
+        // 既存マーカーがあれば削除
+        if (this.currentLocationMarkerId) {
+          await this.map.removeMarker(this.currentLocationMarkerId);
+        }
+
+        // 現在地マーカーを追加
+        this.currentLocationMarkerId = await this.map.addMarker({
+          coordinate: { lat: this.curLat, lng: this.curLng },
+          title: '現在地',
+          snippet: 'ここにいます',
+        });
+      }
+    );
+  }
+
+  stopTrackingCurrentLocation() {
+    if (this.watchId) {
+      Geolocation.clearWatch({ id: this.watchId });
+      this.watchId = undefined;
+    }
+  }
+
   async addMarkerMode() {
     this.isAddMarkerMode = true;
     alert('マーカー追加モード ON');
@@ -130,7 +180,11 @@ export class MapPage implements OnInit, AfterViewInit {
 
   viewMode() {
     this.isAddMarkerMode = false;
-     alert('マーカー追加モード OFF');
+    alert('マーカー追加モード OFF');
+    // マップ中心を更新
+    if (this.curLat && this.curLng) {
+      this.map.setCamera({ coordinate: { lat: this.curLat, lng: this.curLng }, zoom: 15 });
+    }
   }
 
 
