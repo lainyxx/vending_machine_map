@@ -8,11 +8,11 @@ import { Firestore, collectionData, collection, addDoc } from '@angular/fire/fir
 import { Geolocation } from '@capacitor/geolocation';
 import { Observable, Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
-import { homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline } from 'ionicons/icons';
+import { locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline } from 'ionicons/icons';
 import { Auth, signInAnonymously, User, getAuth } from '@angular/fire/auth';
+import { Router } from '@angular/router';
 
 
 // Firestore の vendingMachines ドキュメント型
@@ -45,14 +45,12 @@ export class MapPage implements OnInit, AfterViewInit {
 
   constructor(
     private renderer: Renderer2,
+    private router: Router,
   ) {
-    addIcons({ homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
+    addIcons({ locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
 
   async ngOnInit() {
-    const firebaseConfig = environment.firebase;
-    const app = initializeApp(firebaseConfig);
-    
     // 匿名ログイン
     this.auth = getAuth()
     try {
@@ -64,7 +62,7 @@ export class MapPage implements OnInit, AfterViewInit {
     }
 
     // データベース接続
-    this.db = getFirestore(app);
+    this.db = getFirestore();
     const vendingCol = collection(this.db, 'vendingMachines');
     const vendingMachines$: Observable<VendingMachine[]> = collectionData(vendingCol, { idField: 'id' })
     .pipe(
@@ -110,6 +108,9 @@ export class MapPage implements OnInit, AfterViewInit {
       },
     });
 
+    // マップ作成後に現在地監視開始
+    this.startTrackingCurrentLocation();
+
     // マップクリックリスナー
     this.map.setOnMapClickListener(async (event) => {
       if (!this.isAddMarkerMode) return;
@@ -117,21 +118,14 @@ export class MapPage implements OnInit, AfterViewInit {
       const lat = event.latitude;
       const lng = event.longitude;
 
-      const markerId = await this.map.addMarker({
-        coordinate: { lat, lng },
-        title: '新しいマーカー',
+      // 座標を持って詳細入力ページへ遷移
+      this.router.navigate(['/add-marker'], {
+        state: { lat, lng }
       });
-      this.markerIds.push(markerId);
 
-      // Firestore に保存
-      await this.addMarkerFirestore(lat, lng);
-
-      // 追加後にモードを自動OFFにしたい場合は以下
-      // this.isAddMarkerMode = false;
+      // 追加後にモードをOFF
+      this.isAddMarkerMode = false;
     });
-
-    // マップ作成後に現在地監視開始
-    this.startTrackingCurrentLocation();
   }
 
   // 画面離脱時
@@ -196,18 +190,22 @@ async addMarkerFirestore(lat: number, lng: number) {
     }
   }
 
-  addMarkerMode() {
-    this.isAddMarkerMode = true;
-    alert('マーカー追加モード ON');
-  }
-
-  viewMode() {
-    this.isAddMarkerMode = false;
+  currentLocation() {
     // マップ中心を更新
     if (this.curLat && this.curLng) {
       this.map.setCamera({ coordinate: { lat: this.curLat, lng: this.curLng }, zoom: 15 });
     }
   }
+
+  toggleAddMarkerMode() {
+    this.isAddMarkerMode = !this.isAddMarkerMode;
+  }
+
+  // キャンセルボタン押下時
+  cancelAddMarkerMode() {
+    this.isAddMarkerMode = false;
+  }
+
 
 
   // ボタンを押したときのエフェクト
