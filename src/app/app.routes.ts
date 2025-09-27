@@ -9,4 +9,8 @@ export const routes: Routes = [
     path: '',
     loadComponent: () => import('./map/map.page').then( m => m.MapPage)
   },
+  {
+    path: 'add-marker',
+    loadComponent: () => import('./add-marker/add-marker.page').then( m => m.AddMarkerPage)
+  },
 ];

@@ -1,16 +1,22 @@
   <ion-header>
     <ion-toolbar>
       <ion-title size="large" slot="">自販機マップ</ion-title>
-      <!-- test -->
-      <p *ngIf="user">ログイン成功！UID: {{ user.uid }}</p>
-      <p *ngIf="!user">ログイン処理中...</p>
     </ion-toolbar>
   </ion-header>
 
 
-<ion-content [fullscreen]="true">
-
-
+<ion-content [fullscreen]="true" class="map-container">
+  <!-- マーカー追加モード時に表示 -->
+   @if (isAddMarkerMode) {
+     <div class="add-marker-overlay">
+       <div class="message">
+         <p>マーカーを追加する位置をタップしてください</p>
+         <ion-button color="danger" size="small" (click)="cancelAddMarkerMode()">
+           キャンセル
+         </ion-button>
+       </div>
+     </div>
+   }
   <!-- 高さを必ず指定する -->
   <capacitor-google-map
     id="map"
@@ -22,13 +28,13 @@
 <ion-footer>
   <ion-toolbar>
     <ion-buttons slot="primary">
-      <ion-button class="ripple-button round" (click)="viewMode(); rippleEffect($event)">
-        <ion-icon slot="icon-only" name="home-outline"></ion-icon>
+      <ion-button class="ripple-button round" (click)="currentLocation(); rippleEffect($event)">
+        <ion-icon slot="icon-only" name="location-outline"></ion-icon>
       </ion-button>
       <ion-button class="ripple-button round" (click)="rippleEffect($event)">
         <ion-icon slot="icon-only" name="search-outline"></ion-icon>
       </ion-button>
-      <ion-button class="ripple-button round" (click)="addMarkerMode(); rippleEffect($event)">
+      <ion-button class="ripple-button round" (click)="toggleAddMarkerMode(); rippleEffect($event)">
         <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
       </ion-button>
       <ion-button class="ripple-button round" (click)="rippleEffect($event)">

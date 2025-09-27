@@ -32,6 +32,36 @@ ion-icon {
   color: #555;
 }
 
+
+
+
+// マーカー追加位置指定時
+.add-marker-overlay {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  z-index: 1000;
+  text-align: center;
+}
+
+.add-marker-overlay p {
+  margin: 0 0 8px 0;
+}
+
+.add-marker-overlay ion-button {
+  --padding-start: 10px;
+  --padding-end: 10px;
+  --ion-color-base: white;
+  --color: black;
+}
+
+
+// rippleエフェクト
 .ripple-button {
   position: relative;
   overflow: hidden; /* ボタンからはみ出さないようにする */
