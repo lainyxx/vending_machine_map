@@ -1,6 +1,9 @@
   <ion-header>
     <ion-toolbar>
       <ion-title size="large" slot="">自販機マップ</ion-title>
+      <!-- test -->
+      <p *ngIf="user">ログイン成功！UID: {{ user.uid }}</p>
+      <p *ngIf="!user">ログイン処理中...</p>
     </ion-toolbar>
   </ion-header>
 

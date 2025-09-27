@@ -6,12 +6,13 @@ import { GoogleMap } from '@capacitor/google-maps';
 import { environment } from '../../environments/environment';
 import { Firestore, collectionData, collection, addDoc } from '@angular/fire/firestore';
 import { Geolocation } from '@capacitor/geolocation';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { addIcons } from 'ionicons';
 import { homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline } from 'ionicons/icons';
+import { Auth, signInAnonymously, User, getAuth } from '@angular/fire/auth';
 
 
 // Firestore の vendingMachines ドキュメント型
@@ -38,14 +39,31 @@ export class MapPage implements OnInit, AfterViewInit {
   watchId?: string;
   curLat?: number;
   curLng?: number;
+  user: User | null = null;
+  private sub?: Subscription;
+  private auth?: Auth;
 
-  constructor(private renderer: Renderer2) {
+  constructor(
+    private renderer: Renderer2,
+  ) {
     addIcons({ homeOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
 
-  ngOnInit() {
+  async ngOnInit() {
     const firebaseConfig = environment.firebase;
     const app = initializeApp(firebaseConfig);
+    
+    // 匿名ログイン
+    this.auth = getAuth()
+    try {
+      const result = await signInAnonymously(this.auth);
+      this.user = result.user;
+      console.log('匿名ログイン成功:', this.user.uid);
+    } catch (err) {
+      console.error('匿名ログイン失敗:', err);
+    }
+
+    // データベース接続
     this.db = getFirestore(app);
     const vendingCol = collection(this.db, 'vendingMachines');
     const vendingMachines$: Observable<VendingMachine[]> = collectionData(vendingCol, { idField: 'id' })
@@ -62,7 +80,7 @@ export class MapPage implements OnInit, AfterViewInit {
       )
     );
 
-    vendingMachines$.subscribe(async (machines) => {
+    this.sub = vendingMachines$.subscribe(async (machines) => {
       if (!this.map) return;
 
       if (this.markerIds.length > 0) {
@@ -92,13 +110,6 @@ export class MapPage implements OnInit, AfterViewInit {
       },
     });
 
-    // サンプルマーカー
-    await this.map.addMarker({
-      coordinate: { lat: 35.6804, lng: 139.7690 },
-      title: '東京駅',
-      snippet: 'サンプル',
-    });
-
     // マップクリックリスナー
     this.map.setOnMapClickListener(async (event) => {
       if (!this.isAddMarkerMode) return;
@@ -113,25 +124,37 @@ export class MapPage implements OnInit, AfterViewInit {
       this.markerIds.push(markerId);
 
       // Firestore に保存
-      await this.addMarker(lat, lng);
+      await this.addMarkerFirestore(lat, lng);
 
       // 追加後にモードを自動OFFにしたい場合は以下
       // this.isAddMarkerMode = false;
     });
+
     // マップ作成後に現在地監視開始
     this.startTrackingCurrentLocation();
   }
 
   // 画面離脱時
   ngOnDestroy() {
-    this.stopTrackingCurrentLocation();
-  }
+  this.stopTrackingCurrentLocation();
+  this.sub?.unsubscribe();
+}
 
   // Firestore にマーカー追加
-  async addMarker(lat: number, lng: number) {
-    const vendingCol = collection(this.db, 'vendingMachines');
-    await addDoc(vendingCol, { lat, lng });
+async addMarkerFirestore(lat: number, lng: number) {
+  if (!this.user) {
+    console.warn('ユーザー未ログインのため保存できません');
+    return;
   }
+
+  const vendingCol = collection(this.db, 'vendingMachines');
+  await addDoc(vendingCol, {
+    lat,
+    lng,
+    userId: this.user.uid, // ← 匿名ユーザーのUIDを保存
+    createdAt: new Date()
+  });
+}
 
   async startTrackingCurrentLocation() {
     // すでに監視中なら停止
@@ -173,14 +196,13 @@ export class MapPage implements OnInit, AfterViewInit {
     }
   }
 
-  async addMarkerMode() {
+  addMarkerMode() {
     this.isAddMarkerMode = true;
     alert('マーカー追加モード ON');
   }
 
   viewMode() {
     this.isAddMarkerMode = false;
-    alert('マーカー追加モード OFF');
     // マップ中心を更新
     if (this.curLat && this.curLng) {
       this.map.setCamera({ coordinate: { lat: this.curLat, lng: this.curLng }, zoom: 15 });
