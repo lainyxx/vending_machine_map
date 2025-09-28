@@ -13,6 +13,8 @@ import { addIcons } from 'ionicons';
 import { locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline } from 'ionicons/icons';
 import { Auth, signInAnonymously, User, getAuth } from '@angular/fire/auth';
 import { Router } from '@angular/router';
+import { ToastController } from '@ionic/angular';
+import { Toast } from '@capacitor/toast';
 
 
 // Firestore の vendingMachines ドキュメント型
@@ -20,6 +22,10 @@ interface VendingMachine {
   lat: number;
   lng: number;
   id?: string;
+  minPrice: string;
+  maxPrice: string;
+  manufacturers: string[];
+  createdAt: Date;
 }
 
 @Component({
@@ -46,6 +52,7 @@ export class MapPage implements OnInit, AfterViewInit {
   constructor(
     private renderer: Renderer2,
     private router: Router,
+    private toastController: ToastController,
   ) {
     addIcons({ locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
@@ -73,7 +80,11 @@ export class MapPage implements OnInit, AfterViewInit {
           .map(d => ({
             lat: d.lat,
             lng: d.lng,
-            id: d.id
+            id: d.id,
+            minPrice: d.minPrice,
+            maxPrice: d.maxPrice,
+            manufacturers: d.manufacturers,
+            createdAt: d.createdAt,
           }))
       )
     );
@@ -90,6 +101,7 @@ export class MapPage implements OnInit, AfterViewInit {
         const markerId = await this.map.addMarker({
           coordinate: { lat: m.lat, lng: m.lng },
           title: '自販機',
+          snippet: `価格: ${m.minPrice}〜${m.maxPrice}円 メーカー: ${m.manufacturers.join(', ')}`,
         });
         this.markerIds.push(markerId);
       }
@@ -114,6 +126,8 @@ export class MapPage implements OnInit, AfterViewInit {
     // マップクリックリスナー
     this.map.setOnMapClickListener(async (event) => {
       if (!this.isAddMarkerMode) return;
+      // 追加モードをOFF
+      this.isAddMarkerMode = false;
 
       const lat = event.latitude;
       const lng = event.longitude;
@@ -122,9 +136,6 @@ export class MapPage implements OnInit, AfterViewInit {
       this.router.navigate(['/add-marker'], {
         state: { lat, lng }
       });
-
-      // 追加後にモードをOFF
-      this.isAddMarkerMode = false;
     });
   }
 
@@ -167,18 +178,6 @@ async addMarkerFirestore(lat: number, lng: number) {
 
         this.curLat = position.coords.latitude;
         this.curLng = position.coords.longitude;
-
-        // 既存マーカーがあれば削除
-        if (this.currentLocationMarkerId) {
-          await this.map.removeMarker(this.currentLocationMarkerId);
-        }
-
-        // 現在地マーカーを追加
-        this.currentLocationMarkerId = await this.map.addMarker({
-          coordinate: { lat: this.curLat, lng: this.curLng },
-          title: '現在地',
-          snippet: 'ここにいます',
-        });
       }
     );
   }
@@ -190,10 +189,15 @@ async addMarkerFirestore(lat: number, lng: number) {
     }
   }
 
-  currentLocation() {
+  async currentLocation() {
     // マップ中心を更新
     if (this.curLat && this.curLng) {
       this.map.setCamera({ coordinate: { lat: this.curLat, lng: this.curLng }, zoom: 15 });
+      // トースト表示
+      await Toast.show({
+        text: '現在地に移動しました',
+        duration: 'short'
+      });
     }
   }
 

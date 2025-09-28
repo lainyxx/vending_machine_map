@@ -1,19 +1,69 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>マーカー追加</ion-title>
+    <ion-title>自販機情報追加</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-item>
-    <ion-label position="stacked">名前</ion-label>
-    <ion-input [(ngModel)]="name"></ion-input>
-  </ion-item>
+  <ion-list>
+    <!-- 最低価格 -->
+    <ion-item>
+      <ion-label position="stacked">最低価格</ion-label>
+      <ion-select [(ngModel)]="minPrice" name="minPrice"  placeholder="選択してください" (ionChenge)="test()">
+        <ion-select-option value="10">10円</ion-select-option>
+        <ion-select-option value="20">20円</ion-select-option>
+        <ion-select-option value="30">30円</ion-select-option>
+        <ion-select-option value="40">40円</ion-select-option>
+        <ion-select-option value="50">50円</ion-select-option>
+        <ion-select-option value="60">60円</ion-select-option>
+        <ion-select-option value="70">70円</ion-select-option>
+        <ion-select-option value="80">80円</ion-select-option>
+        <ion-select-option value="90">90円</ion-select-option>
+        <ion-select-option value="100">100円</ion-select-option>
+        <ion-select-option value="110">110円</ion-select-option>
+        <ion-select-option value="120">120円</ion-select-option>
+      </ion-select>
+    </ion-item>
+  
+    <!-- 最高価格 -->
+    <ion-item>
+      <ion-label position="stacked">最高価格</ion-label>
+      <ion-select [(ngModel)]="maxPrice" name="maxPrice" ngDefaultControl placeholder="選択してください">
+        <ion-select-option value="10">10円</ion-select-option>
+        <ion-select-option value="20">20円</ion-select-option>
+        <ion-select-option value="30">30円</ion-select-option>
+        <ion-select-option value="40">40円</ion-select-option>
+        <ion-select-option value="50">50円</ion-select-option>
+        <ion-select-option value="60">60円</ion-select-option>
+        <ion-select-option value="70">70円</ion-select-option>
+        <ion-select-option value="80">80円</ion-select-option>
+        <ion-select-option value="90">90円</ion-select-option>
+        <ion-select-option value="100">100円</ion-select-option>
+        <ion-select-option value="110">110円</ion-select-option>
+        <ion-select-option value="120">120円</ion-select-option>
+        <ion-select-option value="130">130円</ion-select-option>
+        <ion-select-option value="140">140円</ion-select-option>
+        <ion-select-option value="150">150円</ion-select-option>
+        <ion-select-option value="160">160円</ion-select-option>
+        <ion-select-option value="170">170円</ion-select-option>
+        <ion-select-option value="180">180円</ion-select-option>
+        <ion-select-option value="200">200円以上</ion-select-option>
+      </ion-select>
+    </ion-item>
+  
+    <!-- メーカー（複数選択可） -->
+    <ion-item>
+      <ion-label position="stacked">メーカー</ion-label>
+      <ion-select [(ngModel)]="manufacturers" name="manufacturers" ngDefaultControl placeholder="メーカーを選択" multiple="true">
+        <ion-select-option>コカ・コーラ</ion-select-option>
+        <ion-select-option>サントリー</ion-select-option>
+        <ion-select-option>アサヒ</ion-select-option>
+        <ion-select-option>キリン</ion-select-option>
+        <ion-select-option>その他</ion-select-option>
+      </ion-select>
+    </ion-item>
+  </ion-list>
 
-  <ion-item>
-    <ion-label position="stacked">説明</ion-label>
-    <ion-textarea [(ngModel)]="description"></ion-textarea>
-  </ion-item>
-
+  <!-- 保存ボタン -->
   <ion-button expand="block" (click)="save()">保存</ion-button>
 </ion-content>
