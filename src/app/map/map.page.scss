@@ -60,6 +60,20 @@ ion-icon {
   --color: black;
 }
 
+
+.marker-info-overlay {
+  position: absolute;
+  bottom: 70px; /* フッターより上に表示 */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.95);
+  padding: 10px 20px;
+  border-radius: 8px;
+  z-index: 1000;
+  min-width: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 // rippleエフェクト
 .ripple-button {
   position: relative;

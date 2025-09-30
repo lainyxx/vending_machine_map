@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular/standalone';
 import { GoogleMap } from '@capacitor/google-maps';
 import { environment } from '../../environments/environment';
-import { Firestore, collectionData, collection, addDoc } from '@angular/fire/firestore';
+import { Firestore, collectionData, collection, addDoc, deleteDoc, doc } from '@angular/fire/firestore';
 import { Geolocation } from '@capacitor/geolocation';
 import { Observable, Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -13,7 +13,6 @@ import { addIcons } from 'ionicons';
 import { locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline } from 'ionicons/icons';
 import { Auth, signInAnonymously, User, getAuth } from '@angular/fire/auth';
 import { Router } from '@angular/router';
-import { ToastController } from '@ionic/angular';
 import { Toast } from '@capacitor/toast';
 
 
@@ -26,6 +25,7 @@ interface VendingMachine {
   maxPrice: string;
   manufacturers: string[];
   createdAt: Date;
+  userId: string;
 }
 
 @Component({
@@ -48,11 +48,12 @@ export class MapPage implements OnInit, AfterViewInit {
   user: User | null = null;
   private sub?: Subscription;
   private auth?: Auth;
+  currentMachines: VendingMachine[] = [];
+  private markerMap: Record<string, string> = {}; // { mapMarkerId: firestoreId }
 
   constructor(
     private renderer: Renderer2,
     private router: Router,
-    private toastController: ToastController,
   ) {
     addIcons({ locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
@@ -85,6 +86,7 @@ export class MapPage implements OnInit, AfterViewInit {
             maxPrice: d.maxPrice,
             manufacturers: d.manufacturers,
             createdAt: d.createdAt,
+            userId: d.userId,
           }))
       )
     );
@@ -97,13 +99,17 @@ export class MapPage implements OnInit, AfterViewInit {
         this.markerIds = [];
       }
 
+      this.currentMachines = machines;
+
       for (const m of machines) {
         const markerId = await this.map.addMarker({
           coordinate: { lat: m.lat, lng: m.lng },
-          title: '自販機',
-          snippet: `価格: ${m.minPrice}〜${m.maxPrice}円 メーカー: ${m.manufacturers.join(', ')}`,
+          // title: '自販機',
+          // snippet: `価格: ${m.minPrice}〜${m.maxPrice}円 メーカー: ${m.manufacturers.join(', ')}`,
         });
         this.markerIds.push(markerId);
+        // マッピングを保存
+        this.markerMap[markerId] = m.id!;
       }
     });
   }
@@ -137,12 +143,58 @@ export class MapPage implements OnInit, AfterViewInit {
         state: { lat, lng }
       });
     });
+
+    // マーカークリックリスナー
+    this.map.setOnMarkerClickListener((event) => {
+      const mapMarkerId = event.markerId;
+      const firestoreId = this.markerMap[mapMarkerId];
+      if (!firestoreId) return;
+
+      const machine = this.currentMachines.find(m => m.id === firestoreId);
+      if (!machine) return;
+
+      const isMine = machine.userId === this.user?.uid;
+      this.showMarkerInfo(machine, isMine);
+    });
   }
 
   // 画面離脱時
   ngOnDestroy() {
   this.stopTrackingCurrentLocation();
   this.sub?.unsubscribe();
+}
+
+showMarkerInfo(machine: VendingMachine, isMine: boolean) {
+  const infoOverlay = document.getElementById('marker-info');
+  if (!infoOverlay) return;
+
+  // 内容を作成
+  infoOverlay.innerHTML = `
+    <div>
+      <p>価格: ${machine.minPrice}〜${machine.maxPrice}円</p>
+      <p>メーカー: ${machine.manufacturers.join(', ')}</p>
+      ${isMine ? '<button id="delete-marker-btn">削除</button>' : ''}
+      <button id="close-info-btn">閉じる</button>
+    </div>
+  `;
+
+  infoOverlay.style.display = 'block';
+
+  // 削除ボタン
+  const deleteBtn = document.getElementById('delete-marker-btn');
+  if (deleteBtn) {
+    deleteBtn.onclick = async () => {
+      await this.deleteMarkerFirestore(machine.id!);
+      await this.map.removeMarker(machine.id!);
+      infoOverlay.style.display = 'none';
+    };
+  }
+
+  // 閉じるボタン
+  const closeBtn = document.getElementById('close-info-btn');
+  closeBtn!.onclick = () => {
+    infoOverlay.style.display = 'none';
+  };
 }
 
   // Firestore にマーカー追加
@@ -160,6 +212,17 @@ async addMarkerFirestore(lat: number, lng: number) {
     createdAt: new Date()
   });
 }
+
+  // Firestore のマーカー削除
+  async deleteMarkerFirestore(id: string) {
+    if (!this.user) {
+      console.warn('ユーザー未ログインのため削除できません');
+      return;
+    }
+
+    const vendingCol = collection(this.db, 'vendingMachines');
+    await deleteDoc(doc(vendingCol, id));
+  }
 
   async startTrackingCurrentLocation() {
     // すでに監視中なら停止
