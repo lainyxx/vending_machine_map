@@ -1,5 +1,10 @@
 <ion-header>
   <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()">
+        <ion-icon name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
     <ion-title>自販機情報追加</ion-title>
   </ion-toolbar>
 </ion-header>
@@ -9,7 +14,7 @@
     <!-- 最低価格 -->
     <ion-item>
       <ion-label position="stacked">最低価格</ion-label>
-      <ion-select [(ngModel)]="minPrice" name="minPrice"  placeholder="選択してください" (ionChenge)="test()">
+      <ion-select [(ngModel)]="minPrice" name="minPrice"  placeholder="選択してください">
         <ion-select-option value="10">10円</ion-select-option>
         <ion-select-option value="20">20円</ion-select-option>
         <ion-select-option value="30">30円</ion-select-option>
@@ -64,6 +69,13 @@
     </ion-item>
   </ion-list>
 
+
+  <!-- エラーメッセージ -->
+   @if (errorMessage) {
+     <div style="color: red; margin: 8px 0;">
+       {{ errorMessage }}
+     </div>
+   }
   <!-- 保存ボタン -->
   <ion-button expand="block" (click)="save()">保存</ion-button>
 </ion-content>

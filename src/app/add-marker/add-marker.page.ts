@@ -3,8 +3,8 @@ import { Router } from '@angular/router';
 import { Firestore, collection, addDoc } from '@angular/fire/firestore';
 import { getAuth } from '@angular/fire/auth';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
-import { IonHeader, IonToolbar, IonTitle, IonContent, IonItem, IonLabel, IonInput, IonTextarea, IonButton, IonSelect, IonSelectOption, IonList } from '@ionic/angular/standalone';
+import { FormsModule } from '@angular/forms';
+import { IonHeader, IonToolbar, IonTitle, IonContent, IonItem, IonLabel, IonButtons, IonIcon, IonButton, IonSelect, IonSelectOption, IonList } from '@ionic/angular/standalone';
 import { getFirestore } from 'firebase/firestore';
 import { Location } from '@angular/common';
 
@@ -26,6 +26,8 @@ import { Location } from '@angular/common';
     IonButton,
     IonList,
     IonSelect,
+    IonButtons, 
+    IonIcon,
   ]
 })
 export class AddMarkerPage {
@@ -35,6 +37,7 @@ export class AddMarkerPage {
   maxPrice: string | null = null;
   manufacturers: string[] = [];
   db!: Firestore;
+  errorMessage: string | null = null; // ← エラーメッセージ保持用
 
   constructor(
     private router: Router,
@@ -49,6 +52,23 @@ export class AddMarkerPage {
   }
 
   async save() {
+    this.errorMessage = null; // 初期化
+
+    // --- バリデーション ---
+    if (!this.minPrice || !this.maxPrice || this.manufacturers.length === 0) {
+      this.errorMessage = 'すべての項目を選択してください。';
+      return;
+    }
+
+    const min = Number(this.minPrice);
+    const max = Number(this.maxPrice);
+
+    if (min > max) {
+      this.errorMessage = '最低価格は最高価格を超えることはできません。';
+      return;
+    }
+
+    // --- 保存処理 ---
     const auth = getAuth();
     const user = auth.currentUser;
     console.log(this.manufacturers,this.minPrice,this.maxPrice);
@@ -68,8 +88,7 @@ export class AddMarkerPage {
     this._location.back();
   }
 
-
-  test() {
-    console.log(this.manufacturers,this.minPrice,this.maxPrice);
+  goBack() {
+    this._location.back();
   }
 }
