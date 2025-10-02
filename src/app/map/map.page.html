@@ -1,51 +1,94 @@
+ <!-- フィルターオーバーレイ -->
+@if (showFilter) {
+  <div class="filter-overlay">
+    <div class="filter-panel">
+      <h2>フィルター</h2>
+  
+      <ion-item>
+        <ion-select [(ngModel)]="selectedPrice">
+          @for (price of priceOptions; track $index) {
+            <ion-select-option [value]="price">
+              {{ price }}
+            </ion-select-option>
+          }
+        </ion-select>
+        <ion-label>円以下</ion-label>
+      </ion-item>
+  
+      <ion-item>
+        <ion-label position="stacked">メーカー</ion-label>
+        <ion-select multiple [(ngModel)]="selectedManufacturers">
+          <ion-select-option value="コカコーラ">コカコーラ</ion-select-option>
+          <ion-select-option value="サントリー">サントリー</ion-select-option>
+          <ion-select-option value="アサヒ">アサヒ</ion-select-option>
+          <ion-select-option value="キリン">キリン</ion-select-option>
+          <ion-select-option value="その他">その他</ion-select-option>
+        </ion-select>
+      </ion-item>
+  
+      <ion-button class="filter-button" expand="full" color="medium" (click)="clearFilters()">クリア</ion-button>
+      <ion-button class="filter-button" expand="full" color="primary" (click)="applyFilter()">適用</ion-button>
+      <ion-button class="filter-button" expand="full" color="light" (click)="toggleFilter()">キャンセル</ion-button>
+    </div>
+  </div>
+}
+  
+  
+  <!-- メインコンテンツ -->
+<div  class="ion-page" id="main-content">  
   <ion-header>
     <ion-toolbar>
-      <ion-title size="large" slot="">自販機マップ</ion-title>
+      <ion-title size="large">自販機マップ</ion-title>
     </ion-toolbar>
   </ion-header>
 
+  <ion-content [fullscreen]="true" class="map-container">
+    <!-- マーカー追加モード時に表示 -->
+    @if (isAddMarkerMode) {
+      <div class="add-marker-overlay">
+        <div class="message">
+          <p>自販機を登録する位置をタップしてください</p>
+          <ion-button color="danger" size="small" (click)="cancelAddMarkerMode()">
+            キャンセル
+          </ion-button>
+        </div>
+      </div>
+    }
+    <!-- 高さを必ず指定する -->
+    <capacitor-google-map
+      id="map"
+      style="display: inline-block; width: 100%; height: 100%;"
+    ></capacitor-google-map>
 
-<ion-content [fullscreen]="true" class="map-container">
-  <!-- マーカー追加モード時に表示 -->
-   @if (isAddMarkerMode) {
-     <div class="add-marker-overlay">
-       <div class="message">
-         <p>マーカーを追加する位置をタップしてください</p>
-         <ion-button color="danger" size="small" (click)="cancelAddMarkerMode()">
-           キャンセル
-         </ion-button>
-       </div>
-     </div>
-   }
-  <!-- 高さを必ず指定する -->
-  <capacitor-google-map
-    id="map"
-    style="display: inline-block; width: 100%; height: 100%;"
-  ></capacitor-google-map>
-
-  <!-- マーカー情報オーバーレイ -->
-  <div id="marker-info" class="marker-info-overlay" style="display: none;"></div>
-</ion-content>
+    <!-- マーカー情報オーバーレイ -->
+    <div id="marker-info" class="marker-info-overlay" style="display: none;"></div>
+  </ion-content>
 
 
-<ion-footer>
-  <ion-toolbar>
-    <ion-buttons slot="primary">
-      <ion-button class="ripple-button round" (click)="currentLocation(); rippleEffect($event)">
-        <ion-icon slot="icon-only" name="location-outline"></ion-icon>
-      </ion-button>
-      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
-        <ion-icon slot="icon-only" name="search-outline"></ion-icon>
-      </ion-button>
-      <ion-button class="ripple-button round" (click)="toggleAddMarkerMode(); rippleEffect($event)">
-        <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
-      </ion-button>
-      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
-        <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
-      </ion-button>
-      <ion-button class="ripple-button round" (click)="rippleEffect($event)">
-        <ion-icon slot="icon-only" name="person-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-footer>
+  <ion-footer>
+    <ion-toolbar>
+      <ion-buttons slot="primary">
+        <ion-button class="ripple-button round" (click)="currentLocation(); rippleEffect($event)">
+          <ion-icon slot="icon-only" name="location-outline"></ion-icon>
+        </ion-button>
+        <ion-button class="ripple-button round" (click)="toggleAddMarkerMode(); rippleEffect($event)">
+          <ion-icon slot="icon-only" name="add-circle-outline"></ion-icon>
+        </ion-button>
+         <ion-button class="ripple-button round" (click)="toggleFilter(); rippleEffect($event)">
+          <ion-icon slot="icon-only" name="search-outline"></ion-icon>
+        </ion-button>
+        <!-- <ion-menu-button menu="filterMenu">
+          <ion-button>
+            <ion-icon slot="icon-only" name="search-outline"></ion-icon>
+          </ion-button>
+        </ion-menu-button> -->
+        <!-- <ion-button class="ripple-button round" (click)="rippleEffect($event)">
+          <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
+        </ion-button>
+        <ion-button class="ripple-button round" (click)="rippleEffect($event)">
+          <ion-icon slot="icon-only" name="person-outline"></ion-icon>
+        </ion-button> -->
+      </ion-buttons>
+    </ion-toolbar>
+  </ion-footer>
+</div>

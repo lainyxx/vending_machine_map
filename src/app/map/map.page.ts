@@ -1,7 +1,7 @@
 import { Component, OnInit, AfterViewInit, CUSTOM_ELEMENTS_SCHEMA, Renderer2  } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonContent, IonHeader, IonTitle, IonToolbar } from '@ionic/angular/standalone';
+import { IonContent, IonHeader, IonTitle, IonToolbar, IonSelect, IonSelectOption} from '@ionic/angular/standalone';
 import { GoogleMap } from '@capacitor/google-maps';
 import { environment } from '../../environments/environment';
 import { Firestore, collectionData, collection, addDoc, deleteDoc, doc } from '@angular/fire/firestore';
@@ -33,7 +33,8 @@ interface VendingMachine {
   templateUrl: './map.page.html',
   styleUrls: ['./map.page.scss'],
   standalone: true,
-  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule,],
+  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule, 
+            IonSelect, IonSelectOption,],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class MapPage implements OnInit, AfterViewInit {
@@ -41,6 +42,7 @@ export class MapPage implements OnInit, AfterViewInit {
   private markerIds: string[] = [];
   db!: Firestore;
   isAddMarkerMode = false; // マーカー追加モード
+  showFilter = false; // フィルター画面表示フラグ
   currentLocationMarkerId?: string;
   watchId?: string;
   curLat?: number;
@@ -50,6 +52,12 @@ export class MapPage implements OnInit, AfterViewInit {
   private auth?: Auth;
   currentMachines: VendingMachine[] = [];
   private markerMap: Record<string, string> = {}; // { mapMarkerId: firestoreId }
+  selectedPrice?: number;
+  selectedManufacturers: string[] = [];
+  private allMachines: VendingMachine[] = []; // ← 全データ保持
+  // 10〜100まで10刻みの配列を作成
+  priceOptions: number[] = Array.from({length: 10}, (_, i) => (i + 1) * 10);
+
 
   constructor(
     private renderer: Renderer2,
@@ -90,27 +98,10 @@ export class MapPage implements OnInit, AfterViewInit {
           }))
       )
     );
-
+    // マーカーを購読して表示
     this.sub = vendingMachines$.subscribe(async (machines) => {
-      if (!this.map) return;
-
-      if (this.markerIds.length > 0) {
-        await this.map.removeMarkers(this.markerIds);
-        this.markerIds = [];
-      }
-
-      this.currentMachines = machines;
-
-      for (const m of machines) {
-        const markerId = await this.map.addMarker({
-          coordinate: { lat: m.lat, lng: m.lng },
-          // title: '自販機',
-          // snippet: `価格: ${m.minPrice}〜${m.maxPrice}円 メーカー: ${m.manufacturers.join(', ')}`,
-        });
-        this.markerIds.push(markerId);
-        // マッピングを保存
-        this.markerMap[markerId] = m.id!;
-      }
+      this.allMachines = machines;
+      this.applyFilter();
     });
   }
 
@@ -160,58 +151,58 @@ export class MapPage implements OnInit, AfterViewInit {
 
   // 画面離脱時
   ngOnDestroy() {
-  this.stopTrackingCurrentLocation();
-  this.sub?.unsubscribe();
-}
+    this.stopTrackingCurrentLocation();
+    this.sub?.unsubscribe();
+  }
 
-showMarkerInfo(machine: VendingMachine, isMine: boolean) {
-  const infoOverlay = document.getElementById('marker-info');
-  if (!infoOverlay) return;
+  showMarkerInfo(machine: VendingMachine, isMine: boolean) {
+    const infoOverlay = document.getElementById('marker-info');
+    if (!infoOverlay) return;
 
-  // 内容を作成
-  infoOverlay.innerHTML = `
-    <div>
-      <p>価格: ${machine.minPrice}〜${machine.maxPrice}円</p>
-      <p>メーカー: ${machine.manufacturers.join(', ')}</p>
-      ${isMine ? '<button id="delete-marker-btn">削除</button>' : ''}
-      <button id="close-info-btn">閉じる</button>
-    </div>
-  `;
+    // 内容を作成
+    infoOverlay.innerHTML = `
+      <div>
+        <p>価格: ${machine.minPrice}〜${machine.maxPrice}円</p>
+        <p>メーカー: ${machine.manufacturers.join(', ')}</p>
+        ${isMine ? '<button id="delete-marker-btn">削除</button>' : ''}
+        <button id="close-info-btn">閉じる</button>
+      </div>
+    `;
 
-  infoOverlay.style.display = 'block';
+    infoOverlay.style.display = 'block';
 
-  // 削除ボタン
-  const deleteBtn = document.getElementById('delete-marker-btn');
-  if (deleteBtn) {
-    deleteBtn.onclick = async () => {
-      await this.deleteMarkerFirestore(machine.id!);
-      await this.map.removeMarker(machine.id!);
+    // 削除ボタン
+    const deleteBtn = document.getElementById('delete-marker-btn');
+    if (deleteBtn) {
+      deleteBtn.onclick = async () => {
+        await this.deleteMarkerFirestore(machine.id!);
+        await this.map.removeMarker(machine.id!);
+        infoOverlay.style.display = 'none';
+      };
+    }
+
+    // 閉じるボタン
+    const closeBtn = document.getElementById('close-info-btn');
+    closeBtn!.onclick = () => {
       infoOverlay.style.display = 'none';
     };
   }
 
-  // 閉じるボタン
-  const closeBtn = document.getElementById('close-info-btn');
-  closeBtn!.onclick = () => {
-    infoOverlay.style.display = 'none';
-  };
-}
+    // Firestore にマーカー追加
+  async addMarkerFirestore(lat: number, lng: number) {
+    if (!this.user) {
+      console.warn('ユーザー未ログインのため保存できません');
+      return;
+    }
 
-  // Firestore にマーカー追加
-async addMarkerFirestore(lat: number, lng: number) {
-  if (!this.user) {
-    console.warn('ユーザー未ログインのため保存できません');
-    return;
+    const vendingCol = collection(this.db, 'vendingMachines');
+    await addDoc(vendingCol, {
+      lat,
+      lng,
+      userId: this.user.uid, // ← 匿名ユーザーのUIDを保存
+      createdAt: new Date()
+    });
   }
-
-  const vendingCol = collection(this.db, 'vendingMachines');
-  await addDoc(vendingCol, {
-    lat,
-    lng,
-    userId: this.user.uid, // ← 匿名ユーザーのUIDを保存
-    createdAt: new Date()
-  });
-}
 
   // Firestore のマーカー削除
   async deleteMarkerFirestore(id: string) {
@@ -252,6 +243,47 @@ async addMarkerFirestore(lat: number, lng: number) {
     }
   }
 
+
+  async applyFilter() {
+    if (!this.map) return;
+
+    // 既存マーカーを削除
+    if (this.markerIds.length > 0) {
+      await this.map.removeMarkers(this.markerIds); // await で確実に削除
+      this.markerIds = [];
+      this.markerMap = {};
+    }
+
+    const filtered = this.allMachines.filter(m => {
+      const priceOk =
+        (!this.selectedPrice || Number(m.minPrice) <= this.selectedPrice);
+
+      const manufacturerOk =
+        this.selectedManufacturers.length === 0 ||
+        m.manufacturers.some(man => this.selectedManufacturers.includes(man));
+
+      return priceOk && manufacturerOk;
+    });
+
+    this.currentMachines = filtered;
+
+    // マーカーを順番に追加
+    for (const m of filtered) {
+      const markerId = await this.map.addMarker({
+        coordinate: { lat: m.lat, lng: m.lng },
+      });
+      this.markerIds.push(markerId);
+      this.markerMap[markerId] = m.id!;
+    }
+    this.showFilter = false; // 適用後は閉じる
+  }
+
+  // 選択中の値を初期化する
+  clearFilters() {
+    this.selectedPrice = undefined;
+    this.selectedManufacturers = [];
+  }
+
   async currentLocation() {
     // マップ中心を更新
     if (this.curLat && this.curLng) {
@@ -265,6 +297,7 @@ async addMarkerFirestore(lat: number, lng: number) {
   }
 
   toggleAddMarkerMode() {
+    this.showFilter = false;
     this.isAddMarkerMode = !this.isAddMarkerMode;
   }
 
@@ -273,6 +306,10 @@ async addMarkerFirestore(lat: number, lng: number) {
     this.isAddMarkerMode = false;
   }
 
+  toggleFilter() {
+    this.isAddMarkerMode = false;
+    this.showFilter = !this.showFilter;
+  }
 
 
   // ボタンを押したときのエフェクト
