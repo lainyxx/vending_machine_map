@@ -61,7 +61,24 @@
     ></capacitor-google-map>
 
     <!-- マーカー情報オーバーレイ -->
-    <div id="marker-info" class="marker-info-overlay" style="display: none;"></div>
+    @if (selectedMachine) {
+      <div id="marker-info" class="marker-info-overlay">
+        <div>
+          <p>価格: {{ selectedMachine.minPrice }}〜{{ selectedMachine.maxPrice }}円</p>
+          <p>メーカー: {{ selectedMachine.manufacturers.join(', ') }}</p>
+  
+          <ion-buttons>
+            @if (isMine) {
+              <ion-button (click)="deleteMarker(selectedMachine)">削除</ion-button>
+            } @else {
+              <ion-button (click)="requestDelete(selectedMachine)">削除申請</ion-button>
+            }
+    
+            <ion-button (click)="closeInfo()">閉じる</ion-button>
+          </ion-buttons>
+        </div>
+      </div>
+    }
   </ion-content>
 
 
@@ -77,17 +94,6 @@
          <ion-button class="ripple-button round" (click)="toggleFilter(); rippleEffect($event)">
           <ion-icon slot="icon-only" name="search-outline"></ion-icon>
         </ion-button>
-        <!-- <ion-menu-button menu="filterMenu">
-          <ion-button>
-            <ion-icon slot="icon-only" name="search-outline"></ion-icon>
-          </ion-button>
-        </ion-menu-button> -->
-        <!-- <ion-button class="ripple-button round" (click)="rippleEffect($event)">
-          <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
-        </ion-button>
-        <ion-button class="ripple-button round" (click)="rippleEffect($event)">
-          <ion-icon slot="icon-only" name="person-outline"></ion-icon>
-        </ion-button> -->
       </ion-buttons>
     </ion-toolbar>
   </ion-footer>
