@@ -50,11 +50,13 @@ export class MapPage implements OnInit, AfterViewInit {
   user: User | null = null;
   private sub?: Subscription;
   private auth?: Auth;
-  currentMachines: VendingMachine[] = [];
   private markerMap: Record<string, string> = {}; // { mapMarkerId: firestoreId }
   selectedPrice?: number;
   selectedManufacturers: string[] = [];
   private allMachines: VendingMachine[] = []; // ← 全データ保持
+  currentMachines: VendingMachine[] = [];
+  selectedMachine: VendingMachine | undefined = undefined;
+  isMine = false;
   // 10〜100まで10刻みの配列を作成
   priceOptions: number[] = Array.from({length: 10}, (_, i) => (i + 1) * 10);
 
@@ -156,36 +158,76 @@ export class MapPage implements OnInit, AfterViewInit {
   }
 
   showMarkerInfo(machine: VendingMachine, isMine: boolean) {
-    const infoOverlay = document.getElementById('marker-info');
-    if (!infoOverlay) return;
+    this.selectedMachine = machine;
+    this.isMine = isMine;
+  }
 
-    // 内容を作成
-    infoOverlay.innerHTML = `
-      <div>
-        <p>価格: ${machine.minPrice}〜${machine.maxPrice}円</p>
-        <p>メーカー: ${machine.manufacturers.join(', ')}</p>
-        ${isMine ? '<button id="delete-marker-btn">削除</button>' : ''}
-        <button id="close-info-btn">閉じる</button>
-      </div>
-    `;
+  async deleteMarker(machine: VendingMachine) {
+    if (!machine.id) return;
+    this.selectedMachine = undefined;
+    await this.deleteMarkerFirestore(machine.id);
+    await this.map.removeMarker(machine.id);
+  }
 
-    infoOverlay.style.display = 'block';
+  async requestDelete(machine: VendingMachine) {
+    if (!this.user) {
+      console.warn('ログインしていません');
+      return;
+    }
+    if (!machine.id) return;
+    
+    this.selectedMachine = undefined;
 
-    // 削除ボタン
-    const deleteBtn = document.getElementById('delete-marker-btn');
-    if (deleteBtn) {
-      deleteBtn.onclick = async () => {
-        await this.deleteMarkerFirestore(machine.id!);
-        await this.map.removeMarker(machine.id!);
-        infoOverlay.style.display = 'none';
-      };
+    const reqCol = collection(this.db, 'deleteRequests');
+
+    // 今日の0:00を取得
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // --- 二重申請チェック ---
+    const dupQ = query(
+      reqCol,
+      where('machineId', '==', machine.id),
+      where('requestUserId', '==', this.user.uid)
+    );
+    const dupSnap = await getDocs(dupQ);
+    if (!dupSnap.empty) {
+      await Toast.show({ text: 'すでに削除申請済みです', duration: 'short' });
+      return;
     }
 
-    // 閉じるボタン
-    const closeBtn = document.getElementById('close-info-btn');
-    closeBtn!.onclick = () => {
-      infoOverlay.style.display = 'none';
-    };
+    // --- 1日の上限チェック ---
+    const dailyLimit = 5; // 例：1日5件まで
+    const dailyQ = query(
+      reqCol,
+      where('requestUserId', '==', this.user.uid),
+      where('createdAt', '>=', today)
+    );
+    const dailySnap = await getDocs(dailyQ);
+    if (dailySnap.size >= dailyLimit) {
+      await Toast.show({
+        text: `削除申請は1日${dailyLimit}件までです`,
+        duration: 'short',
+      });
+      return;
+    }
+
+    // --- 登録 ---
+    await addDoc(reqCol, {
+      machineId: machine.id,
+      requestUserId: this.user.uid,
+      createdAt: new Date(),
+    });
+
+    await Toast.show({
+      text: '削除申請を送信しました',
+      duration: 'short',
+    });
+
+  }
+
+  closeInfo() {
+    this.selectedMachine = undefined;
   }
 
     // Firestore にマーカー追加
@@ -298,6 +340,7 @@ export class MapPage implements OnInit, AfterViewInit {
 
   async toggleAddMarkerMode() {
     this.showFilter = false;
+    this.selectedMachine = undefined;
     // 1日あたりの自販機登録を制限
     if (!this.isAddMarkerMode) {
       if (!this.user) {
@@ -343,6 +386,7 @@ export class MapPage implements OnInit, AfterViewInit {
 
   toggleFilter() {
     this.isAddMarkerMode = false;
+    this.selectedMachine = undefined;
     this.showFilter = !this.showFilter;
   }
 
