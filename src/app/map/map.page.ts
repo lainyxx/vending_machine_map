@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonTitle, IonToolbar, IonSelect, IonSelectOption} from '@ionic/angular/standalone';
 import { GoogleMap } from '@capacitor/google-maps';
 import { environment } from '../../environments/environment';
-import { Firestore, collectionData, collection, addDoc, deleteDoc, doc } from '@angular/fire/firestore';
+import { Firestore, collectionData, collection, addDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
 import { Geolocation } from '@capacitor/geolocation';
 import { Observable, Subscription } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -296,8 +296,43 @@ export class MapPage implements OnInit, AfterViewInit {
     }
   }
 
-  toggleAddMarkerMode() {
+  async toggleAddMarkerMode() {
     this.showFilter = false;
+    // 1日あたりの自販機登録を制限
+    if (!this.isAddMarkerMode) {
+      if (!this.user) {
+        console.warn('ユーザー未ログインのため保存できません');
+        return;
+      }
+
+      const vendingCol = collection(this.db, 'vendingMachines');
+
+      // 今日の0:00を取得
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // 今日作成した自販機の数を取得
+      const q = query(
+        vendingCol,
+        where('userId', '==', this.user.uid),
+        where('createdAt', '>=', today)
+      );
+
+      const snapshot = await getDocs(q);
+      const todayCount = snapshot.size;
+
+      const limitPerDay = 5; // ← 登録上限（例）
+
+      if (todayCount >= limitPerDay) {
+        console.warn('1日の登録上限に達しました');
+        await Toast.show({
+          text: `一日の登録上限（${limitPerDay}件）に達しました`,
+          duration: 'short',
+        });
+        return;
+      }
+    }
+    // マーカ作成モード切り替え
     this.isAddMarkerMode = !this.isAddMarkerMode;
   }
 
