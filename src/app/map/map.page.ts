@@ -16,6 +16,9 @@ import { Router } from '@angular/router';
 import { Toast } from '@capacitor/toast';
 
 
+// Google Maps JS API 用（グローバルに読み込まれる）
+declare const google: any;
+
 // Firestore の vendingMachines ドキュメント型
 interface VendingMachine {
   lat: number;
@@ -37,28 +40,39 @@ interface VendingMachine {
             IonSelect, IonSelectOption,],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
-export class MapPage implements OnInit, AfterViewInit {
-  map!: GoogleMap;
-  private markerIds: string[] = [];
+export class MapPage implements OnInit {
+  // Google Maps JS API の Map インスタンス
+  map: any;
+
+  // Firestore / マーカー管理
+  private markerIds: string[] = []; // firestore の id を保持
   db!: Firestore;
+  private markerMap: Record<string, google.maps.Marker> = {}; // firestoreId -> Marker
+
+  // 画面状態
   isAddMarkerMode = false; // マーカー追加モード
-  showFilter = false; // フィルター画面表示フラグ
-  currentLocationMarkerId?: string;
+  showFilter = false; // フィルター表示フラグ
+  mapError = false; // マップ読み込みエラーフラグ
+
+  // 位置情報
+  currentLocationMarker?: google.maps.Marker;
   watchId?: string;
   curLat?: number;
   curLng?: number;
+
+  // 認証・データ
   user: User | null = null;
   private sub?: Subscription;
   private auth?: Auth;
-  private markerMap: Record<string, string> = {}; // { mapMarkerId: firestoreId }
-  selectedPrice?: number;
-  selectedManufacturers: string[] = [];
-  private allMachines: VendingMachine[] = []; // ← 全データ保持
+  private allMachines: VendingMachine[] = []; // 全データ保持
   currentMachines: VendingMachine[] = [];
   selectedMachine: VendingMachine | undefined = undefined;
   isMine = false;
-  // 10〜100まで10刻みの配列を作成
-  priceOptions: number[] = Array.from({length: 10}, (_, i) => (i + 1) * 10);
+
+  // UI補助
+  selectedPrice?: number;
+  selectedManufacturers: string[] = [];
+  priceOptions: number[] = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 
   constructor(
@@ -108,65 +122,108 @@ export class MapPage implements OnInit, AfterViewInit {
   }
 
   async ngAfterViewInit() {
-    // マップ作成
-    this.map = await GoogleMap.create({
-      id: 'map',
-      element: document.getElementById('map')!,
-      apiKey: environment.googleMapsApiKey,
-      config: {
-        center: { lat: 35.6804, lng: 139.7690 }, // 東京駅
-        zoom: 12,
-      },
-    });
+    // map 要素がレンダリングされていないケースに備えて少し待つ
+    await new Promise((res) => setTimeout(res, 120));
+
+    // Google Maps JS API のスクリプトを動的に読み込む
+    try {
+      await this.loadGoogleMapsScript();
+    } catch (err) {
+      console.error('Google Maps script load failed', err);
+      this.mapError = true;
+      return;
+    }
+
+    // Map 作成（既に作成済みなら再作成しない）
+    if (!this.map) {
+      try {
+        const mapEl = document.getElementById('map') as HTMLElement;
+        this.map = new google.maps.Map(mapEl, {
+          center: { lat: 35.6804, lng: 139.7690 }, // 東京駅
+          zoom: 12,
+          fullscreenControl: false,
+        });
+
+        // マップクリックリスナー（追加モード時に座標を取得して遷移）
+        this.map.addListener('click', (e: any) => {
+          if (!this.isAddMarkerMode) return;
+          this.isAddMarkerMode = false;
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+
+          // 詳細入力ページへ遷移（座標を state で渡す）
+          this.router.navigate(['/add-marker'], {
+            state: { lat, lng }
+          });
+        });
+
+        // マップが表示された直後、描画ズレ対応でリサイズトリガー
+        setTimeout(() => {
+          try {
+            google.maps.event.trigger(this.map, 'resize');
+          } catch (e) { /* ignore */ }
+        }, 200);
+
+      } catch (err) {
+        console.error('Google Map init error', err);
+        this.mapError = true;
+        return;
+      }
+    }
 
     // マップ作成後に現在地監視開始
     this.startTrackingCurrentLocation();
-
-    // マップクリックリスナー
-    this.map.setOnMapClickListener(async (event) => {
-      if (!this.isAddMarkerMode) return;
-      // 追加モードをOFF
-      this.isAddMarkerMode = false;
-
-      const lat = event.latitude;
-      const lng = event.longitude;
-
-      // 座標を持って詳細入力ページへ遷移
-      this.router.navigate(['/add-marker'], {
-        state: { lat, lng }
-      });
-    });
-
-    // マーカークリックリスナー
-    this.map.setOnMarkerClickListener((event) => {
-      const mapMarkerId = event.markerId;
-      const firestoreId = this.markerMap[mapMarkerId];
-      if (!firestoreId) return;
-
-      const machine = this.currentMachines.find(m => m.id === firestoreId);
-      if (!machine) return;
-
-      const isMine = machine.userId === this.user?.uid;
-      this.showMarkerInfo(machine, isMine);
-    });
   }
 
-  // 画面離脱時
+// --- ライフサイクル: 破棄時に監視解除等 ---
   ngOnDestroy() {
     this.stopTrackingCurrentLocation();
     this.sub?.unsubscribe();
+
+    // Map 上の全マーカーを解除
+    for (const fid of Object.keys(this.markerMap)) {
+      try {
+        this.markerMap[fid].setMap(null);
+      } catch (e) { /* ignore */ }
+    }
+    this.markerMap = {};
+    this.markerIds = [];
   }
 
-  showMarkerInfo(machine: VendingMachine, isMine: boolean) {
-    this.selectedMachine = machine;
-    this.isMine = isMine;
+  // --- Google Maps JS を動的に読み込むヘルパー ---
+  private loadGoogleMapsScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if ((window as any).google && (window as any).google.maps) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${environment.googleMapsApiKey}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = (err) => reject(err);
+      document.head.appendChild(script);
+    });
   }
+  
 
+  // --- マーカー削除（UI + Firestore） ---
   async deleteMarker(machine: VendingMachine) {
     if (!machine.id) return;
     this.selectedMachine = undefined;
+
+    // Firestore 側を削除
     await this.deleteMarkerFirestore(machine.id);
-    await this.map.removeMarker(machine.id);
+
+    // 地図上のマーカーを削除
+    const marker = this.markerMap[machine.id];
+    if (marker) {
+      marker.setMap(null);
+      delete this.markerMap[machine.id];
+      const idx = this.markerIds.indexOf(machine.id);
+      if (idx >= 0) this.markerIds.splice(idx, 1);
+    }
   }
 
   async requestDelete(machine: VendingMachine) {
@@ -226,9 +283,7 @@ export class MapPage implements OnInit, AfterViewInit {
 
   }
 
-  closeInfo() {
-    this.selectedMachine = undefined;
-  }
+  
 
     // Firestore にマーカー追加
   async addMarkerFirestore(lat: number, lng: number) {
@@ -286,24 +341,25 @@ export class MapPage implements OnInit, AfterViewInit {
   }
 
 
-  async applyFilter() {
+  applyFilter() {
     if (!this.map) return;
 
-    // 既存マーカーを削除
-    if (this.markerIds.length > 0) {
-      await this.map.removeMarkers(this.markerIds); // await で確実に削除
-      this.markerIds = [];
-      this.markerMap = {};
+     // 既存マーカーをすべて削除
+    for (const fid of this.markerIds) {
+      const m = this.markerMap[fid];
+      if (m) {
+        m.setMap(null);
+        delete this.markerMap[fid];
+      }
     }
+    this.markerIds = [];
 
+    // フィルタ条件にマッチする自販機のみ選択
     const filtered = this.allMachines.filter(m => {
-      const priceOk =
-        (!this.selectedPrice || Number(m.minPrice) <= this.selectedPrice);
-
+      const priceOk = (!this.selectedPrice || Number(m.minPrice) <= this.selectedPrice);
       const manufacturerOk =
         this.selectedManufacturers.length === 0 ||
-        m.manufacturers.some(man => this.selectedManufacturers.includes(man));
-
+        (m.manufacturers || []).some(man => this.selectedManufacturers.includes(man));
       return priceOk && manufacturerOk;
     });
 
@@ -311,13 +367,33 @@ export class MapPage implements OnInit, AfterViewInit {
 
     // マーカーを順番に追加
     for (const m of filtered) {
-      const markerId = await this.map.addMarker({
-        coordinate: { lat: m.lat, lng: m.lng },
+      if (!m.id) continue;
+      const marker = new google.maps.Marker({
+        position: { lat: m.lat, lng: m.lng },
+        map: this.map,
+        title: `自販機: ${m.id}`,
       });
-      this.markerIds.push(markerId);
-      this.markerMap[markerId] = m.id!;
+
+      // マーカークリックで詳細表示（closure により machine を参照）
+      marker.addListener('click', () => {
+        const isMine = m.userId === this.user?.uid;
+        this.showMarkerInfo(m, isMine);
+      });
+
+      this.markerIds.push(m.id);
+      this.markerMap[m.id] = marker;
     }
+
     this.showFilter = false; // 適用後は閉じる
+  }
+
+  showMarkerInfo(machine: VendingMachine, isMine: boolean) {
+    this.selectedMachine = machine;
+    this.isMine = isMine;
+  }
+
+  closeInfo() {
+    this.selectedMachine = undefined;
   }
 
   // 選択中の値を初期化する
@@ -326,15 +402,12 @@ export class MapPage implements OnInit, AfterViewInit {
     this.selectedManufacturers = [];
   }
 
+  // --- 現在地へ移動（ユーザ操作） ---
   async currentLocation() {
-    // マップ中心を更新
-    if (this.curLat && this.curLng) {
-      this.map.setCamera({ coordinate: { lat: this.curLat, lng: this.curLng }, zoom: 15 });
-      // トースト表示
-      await Toast.show({
-        text: '現在地に移動しました',
-        duration: 'short'
-      });
+    if (this.curLat && this.curLng && this.map) {
+      this.map.panTo({ lat: this.curLat, lng: this.curLng });
+      this.map?.setZoom(15);
+      await Toast.show({ text: '現在地に移動しました', duration: 'short' });
     }
   }
 

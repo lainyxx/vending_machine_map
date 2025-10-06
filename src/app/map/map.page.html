@@ -42,7 +42,10 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content [fullscreen]="true" class="map-container">
+  <ion-content [fullscreen]="true">
+  <!-- map コンテナ: ion-content の中で高さが取れるようにするのが重要 -->
+  <div id="map" style="width:100%; height:100%;"></div>
+    
     <!-- マーカー追加モード時に表示 -->
     @if (isAddMarkerMode) {
       <div class="add-marker-overlay">
@@ -54,12 +57,13 @@
         </div>
       </div>
     }
-    <!-- 高さを必ず指定する -->
-    <capacitor-google-map
-      id="map"
-      style="display: inline-block; width: 100%; height: 100%;"
-    ></capacitor-google-map>
-
+    <!-- Google Map 読み込み失敗時の警告オーバーレイ -->
+    @if (mapError) {
+      <div class="map-error-overlay">
+        <p>Googleマップの読み込みに失敗しました。<br>
+          ネットワーク環境やAPIキー設定を確認してください。</p>
+      </div>
+    }
     <!-- マーカー情報オーバーレイ -->
     @if (selectedMachine) {
       <div id="marker-info" class="marker-info-overlay">
