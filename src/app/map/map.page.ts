@@ -1,8 +1,7 @@
-import { Component, OnInit, AfterViewInit, CUSTOM_ELEMENTS_SCHEMA, Renderer2  } from '@angular/core';
+import { Component, OnInit, CUSTOM_ELEMENTS_SCHEMA, Renderer2  } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonContent, IonHeader, IonTitle, IonToolbar, IonSelect, IonSelectOption} from '@ionic/angular/standalone';
-import { GoogleMap } from '@capacitor/google-maps';
 import { environment } from '../../environments/environment';
 import { Firestore, collectionData, collection, addDoc, deleteDoc, doc, query, where, getDocs } from '@angular/fire/firestore';
 import { Geolocation } from '@capacitor/geolocation';
@@ -36,7 +35,7 @@ interface VendingMachine {
   templateUrl: './map.page.html',
   styleUrls: ['./map.page.scss'],
   standalone: true,
-  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule, 
+  imports: [IonContent, IonHeader, IonTitle, IonToolbar, CommonModule, FormsModule,
             IonSelect, IonSelectOption,],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
@@ -99,7 +98,7 @@ export class MapPage implements OnInit {
     const vendingMachines$: Observable<VendingMachine[]> = collectionData(vendingCol, { idField: 'id' })
     .pipe(
       // 型変換
-      map((docs) => 
+      map((docs) =>
         docs
           .filter((d): d is any => 'lat' in d && 'lng' in d) // lat/lng があるものだけ
           .map(d => ({
@@ -142,6 +141,7 @@ export class MapPage implements OnInit {
           center: { lat: 35.6804, lng: 139.7690 }, // 東京駅
           zoom: 12,
           fullscreenControl: false,
+          disableDefaultUI: true,
         });
 
         // マップクリックリスナー（追加モード時に座標を取得して遷移）
@@ -173,6 +173,7 @@ export class MapPage implements OnInit {
 
     // マップ作成後に現在地監視開始
     this.startTrackingCurrentLocation();
+    await this.currentLocation(); // マップ中央に移動
   }
 
 // --- ライフサイクル: 破棄時に監視解除等 ---
@@ -206,7 +207,7 @@ export class MapPage implements OnInit {
       document.head.appendChild(script);
     });
   }
-  
+
 
   // --- マーカー削除（UI + Firestore） ---
   async deleteMarker(machine: VendingMachine) {
@@ -232,7 +233,7 @@ export class MapPage implements OnInit {
       return;
     }
     if (!machine.id) return;
-    
+
     this.selectedMachine = undefined;
 
     const reqCol = collection(this.db, 'deleteRequests');
@@ -283,7 +284,7 @@ export class MapPage implements OnInit {
 
   }
 
-  
+
 
     // Firestore にマーカー追加
   async addMarkerFirestore(lat: number, lng: number) {
@@ -329,6 +330,43 @@ export class MapPage implements OnInit {
 
         this.curLat = position.coords.latitude;
         this.curLng = position.coords.longitude;
+
+        // ---  現在地マーカーを表示・更新 ---
+        if (this.map) {
+          const pos = { lat: this.curLat, lng: this.curLng };
+
+          if (!this.currentLocationMarker) {
+            // 初回のみマーカーを作成
+            this.currentLocationMarker = new google.maps.Marker({
+              position: pos,
+              map: this.map,
+              title: '現在地',
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#4285F4',
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+              },
+            });
+            //   現在地にも自販機を追加できるようにクリックイベントを追加
+            if (this.currentLocationMarker) {
+              this.currentLocationMarker.addListener('click', () => {
+                if (!this.isAddMarkerMode) return;
+
+                this.isAddMarkerMode = false;
+                const lat = this.curLat!;
+                const lng = this.curLng!;
+
+                this.router.navigate(['/add-marker'], { state: { lat, lng } });
+              });
+            }
+          } else {
+            // 2回目以降は位置を更新
+            this.currentLocationMarker.setPosition(pos);
+          }
+        }
       }
     );
   }
