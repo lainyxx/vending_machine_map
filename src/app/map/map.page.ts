@@ -13,6 +13,7 @@ import { locationOutline, searchOutline, addCircleOutline, notificationsOutline,
 import { Auth, signInAnonymously, User, getAuth } from '@angular/fire/auth';
 import { Router } from '@angular/router';
 import { Toast } from '@capacitor/toast';
+import { AlertController } from '@ionic/angular';
 
 
 // Google Maps JS API 用（グローバルに読み込まれる）
@@ -73,10 +74,14 @@ export class MapPage implements OnInit {
   selectedManufacturers: string[] = [];
   priceOptions: number[] = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
+  // 1日あたりの削除申請上限
+  dailyLimit: number = 5;
+
 
   constructor(
     private renderer: Renderer2,
     private router: Router,
+    private alertCtrl: AlertController
   ) {
     addIcons({ locationOutline, searchOutline, addCircleOutline, notificationsOutline, personOutline });
   }
@@ -211,78 +216,107 @@ export class MapPage implements OnInit {
 
   // --- マーカー削除（UI + Firestore） ---
   async deleteMarker(machine: VendingMachine) {
-    if (!machine.id) return;
-    this.selectedMachine = undefined;
+  if (!machine.id) return;
 
-    // Firestore 側を削除
-    await this.deleteMarkerFirestore(machine.id);
+  const alert = await this.alertCtrl.create({
+    header: '確認',
+    message: 'この自販機マーカーを削除しますか？',
+    buttons: [
+      {
+        text: 'キャンセル',
+        role: 'cancel',
+      },
+      {
+        text: '削除',
+        role: 'destructive',
+        handler: async () => {
+          this.selectedMachine = undefined;
 
-    // 地図上のマーカーを削除
-    const marker = this.markerMap[machine.id];
-    if (marker) {
-      marker.setMap(null);
-      delete this.markerMap[machine.id];
-      const idx = this.markerIds.indexOf(machine.id);
-      if (idx >= 0) this.markerIds.splice(idx, 1);
-    }
+          // Firestore 側削除
+          await this.deleteMarkerFirestore(machine.id!);
+
+          // 地図上のマーカー削除
+          const marker = this.markerMap[machine.id!];
+          if (marker) {
+            marker.setMap(null);
+            delete this.markerMap[machine.id!];
+            const idx = this.markerIds.indexOf(machine.id!);
+            if (idx >= 0) this.markerIds.splice(idx, 1);
+          }
+
+          await Toast.show({ text: '削除しました', duration: 'short' });
+        },
+      },
+    ],
+  });
+
+  await alert.present();
   }
 
-  async requestDelete(machine: VendingMachine) {
-    if (!this.user) {
-      console.warn('ログインしていません');
-      return;
-    }
-    if (!machine.id) return;
-
-    this.selectedMachine = undefined;
-
-    const reqCol = collection(this.db, 'deleteRequests');
-
-    // 今日の0:00を取得
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // --- 二重申請チェック ---
-    const dupQ = query(
-      reqCol,
-      where('machineId', '==', machine.id),
-      where('requestUserId', '==', this.user.uid)
-    );
-    const dupSnap = await getDocs(dupQ);
-    if (!dupSnap.empty) {
-      await Toast.show({ text: 'すでに削除申請済みです', duration: 'short' });
-      return;
-    }
-
-    // --- 1日の上限チェック ---
-    const dailyLimit = 5; // 例：1日5件まで
-    const dailyQ = query(
-      reqCol,
-      where('requestUserId', '==', this.user.uid),
-      where('createdAt', '>=', today)
-    );
-    const dailySnap = await getDocs(dailyQ);
-    if (dailySnap.size >= dailyLimit) {
-      await Toast.show({
-        text: `削除申請は1日${dailyLimit}件までです`,
-        duration: 'short',
-      });
-      return;
-    }
-
-    // --- 登録 ---
-    await addDoc(reqCol, {
-      machineId: machine.id,
-      requestUserId: this.user.uid,
-      createdAt: new Date(),
-    });
-
-    await Toast.show({
-      text: '削除申請を送信しました',
-      duration: 'short',
-    });
-
+async requestDelete(machine: VendingMachine) {
+  if (!this.user) {
+    console.warn('ログインしていません');
+    return;
   }
+  if (!machine.id) return;
+
+  const alert = await this.alertCtrl.create({
+    header: '確認',
+    message: 'この自販機の削除を申請しますか？',
+    buttons: [
+      {
+        text: 'キャンセル',
+        role: 'cancel',
+      },
+      {
+        text: '申請する',
+        handler: async () => {
+          this.selectedMachine = undefined;
+
+          const reqCol = collection(this.db, 'deleteRequests');
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const dupQ = query(
+            reqCol,
+            where('machineId', '==', machine.id),
+            where('requestUserId', '==', this.user!.uid)
+          );
+          const dupSnap = await getDocs(dupQ);
+          if (!dupSnap.empty) {
+            await Toast.show({ text: 'すでに削除申請済みです', duration: 'short' });
+            return;
+          }
+
+
+          const dailyQ = query(
+            reqCol,
+            where('requestUserId', '==', this.user!.uid),
+            where('createdAt', '>=', today)
+          );
+          const dailySnap = await getDocs(dailyQ);
+          if (dailySnap.size >= this.dailyLimit) {
+            await Toast.show({
+              text: `削除申請は1日${this.dailyLimit}件までです`,
+              duration: 'short',
+            });
+            return;
+          }
+
+          await addDoc(reqCol, {
+            machineId: machine.id,
+            requestUserId: this.user!.uid,
+            createdAt: new Date(),
+          });
+
+          await Toast.show({ text: '削除申請を送信しました', duration: 'short' });
+        },
+      },
+    ],
+  });
+
+  await alert.present();
+}
 
 
 
